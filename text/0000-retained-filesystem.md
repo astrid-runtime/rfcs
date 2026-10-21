@@ -33,9 +33,10 @@ the same interface without inheriting a hosted OS trust claim.
 # Guide-level explanation
 
 A capsule explicitly imports `astrid:fs/retained@1.1.0`. It opens an authorized
-export root, then selects children through retained directory resources. Each
-child name is one component, not a VFS path. File creation returns the selected
-file resource directly. No second pathname lookup is required.
+export root, then selects children through retained directory resources. Lookup
+returns a selected-node resource before a file access mode is chosen. Each child
+name is one component, not a VFS path. File creation returns the selected file
+resource directly. No second pathname lookup is required.
 
 For example, a caller opens `home://`, selects `agent`, then exclusively creates
 `report` with permission bits `0o600`. If another caller wins creation, the
@@ -120,8 +121,9 @@ Directory operations are `stat`, `set-permissions`, `open-directory(name)`,
 `open-file(name, options)`, `create-directory(name, permissions)`, `unlink(name)`,
 `remove-directory(name)`, `rename(name, destination-directory, new-name)` and
 `enumerate`. Directory creation returns its exact created directory resource.
-The interface has no recursive delete, parent traversal or path canonicalization
-operation that can enlarge authority.
+The interface has no recursive delete, arbitrary parent traversal or path
+canonicalization operation that can enlarge authority. The bounded parent
+selection below remains inside the original admitted export.
 
 A child name is nonempty UTF-8 satisfying existing canonical path validation,
 with no slash, NUL, control character, `.` or `..`. Name limits are checked before
@@ -135,6 +137,60 @@ identity validation. Unlinked directory resources may retain metadata custody,
 but cannot create hidden descendants or access a replacement name. Movement
 outside the captured export makes child operations fail `boundary-escape` or
 `stale`; returning to a path does not revive terminally retired authority.
+
+## Selected nodes before file opening
+
+`directory.lookup(name)` returns a selected-node resource and its exact stat.
+Lookup captures the original logical identity and owner/export lifetime, and
+registers custody in the same authoritative root observation that selects the
+child. It does not grant byte read/write access, create or truncate anything.
+The original export and directory rights constrain every later operation.
+
+`directory.parent(access)` selects the authoritative current parent within the
+same original export, with current policy checks, rights narrowing and resource
+custody admission. At the captured export root it selects that same root. After
+a directory rename it uses the current authoritative parent, not a remembered
+walk stack or a former textual path. An unlinked or out-of-export directory
+returns `stale`. It cannot reach an owner namespace or native parent outside the
+export, and it does not provide arbitrary `..` path canonicalization. This
+supports a 9P parent walk without increasing authority.
+
+A selected node exposes `stat`, `clone`, `open-file(access, truncate)` and
+`open-directory(access)`. These operations revalidate the captured authenticated
+principal, current policy and original export lifetime. File opening uses the
+exact selected identity; it never resolves the node's former pathname. Requested
+access is explicit, including write-only, and cannot exceed the original export
+rights. Lookup need not request write access merely because a later file open
+might do so. Truncation requires freshly admitted write access and occurs only
+after return-resource and mutation admission. A node of the wrong kind returns
+the corresponding typed kind error before effects.
+
+Cloning retains the same selected object and original authority. It reserves a
+new selected-resource slot before changing a caller's resource table; failure
+leaves the original resource and namespace unchanged. This supports a zero-name
+9P walk without a new pathname lookup. It does not duplicate an access grant or
+replace current policy checks. A descriptive identity or QID cannot be converted
+into a selected-node resource.
+
+An unlinked regular node may still be opened as that original object while its
+custody and original authority remain valid. Recreating its former name does
+not redirect it. An unlinked directory may retain stat custody but cannot resolve
+children or create hidden descendants. A renamed directory remains usable only
+inside its captured export, subject to its original lifetime and current policy.
+
+Selected-node removal, where supported, is identity-conditional: it removes a
+binding only if that binding still denotes the captured node in the captured
+directory context. A changed or absent binding returns an explicit stale result;
+it never removes a replacement at the old name. Directory `unlink(name)` remains
+a current-name operation relative to the retained parent. Neither operation
+recovers authority by replaying a former path.
+
+Selected-node, directory, enumeration-cursor and opened-file resource admission
+must be finite and explicit. Their ledgers may be shared internally, but the
+existing 16 opened-file ceiling and 1,048,576-byte positional IO ceiling do not
+bound unopened selections or directory cursors. No new numerical default is
+established by this RFC. Every returned resource, including clone and lookup,
+requires its resource-table and custody admission before publication or effects.
 
 ## Atomic file opening and creation
 
