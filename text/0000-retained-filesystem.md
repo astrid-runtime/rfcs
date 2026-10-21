@@ -204,8 +204,12 @@ Open options specify access (`read`, `write`, `read-write`), disposition
 (`existing`, `open-or-create`, `exclusive-create`), `truncate`, and optional
 creation permission bits. There is no implicit append cursor: the interface
 uses positional IO. Truncate requires write access; creation requires explicit
-permissions; creation permissions on `existing` are invalid. Read-only creation
-and truncation are rejected. These combinations are validated before mutation.
+permissions; creation permissions on `existing` are invalid. A writable parent
+with current namespace-mutation authority may create a file and return a read-only
+file resource; this does not grant byte-write access or allow creation through a
+read-only directory. Read-only truncation is rejected. Every truncating operation
+requires current byte-write admission in addition to namespace-mutation admission
+when its disposition may create. These combinations are validated before mutation.
 
 One authoritative root attempt selects or creates the regular file and checks
 parent identity/type and destination predicates. Before guarded publication it
