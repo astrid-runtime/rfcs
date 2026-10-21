@@ -155,8 +155,14 @@ returns `stale`. It cannot reach an owner namespace or native parent outside the
 export, and it does not provide arbitrary `..` path canonicalization. This
 supports a 9P parent walk without increasing authority.
 
-A selected node exposes `stat`, `clone`, `open-file(access, truncate)` and
-`open-directory(access)`. These operations revalidate the captured authenticated
+A selected node exposes `stat`, `clone`, directory-only `lookup(name)` and
+`parent`, `open-file(access, truncate)` and `open-directory(access)`. Selected-node
+traversal admits current read policy while preserving the original export's
+access ceiling for a later explicit file open; traversal itself grants no byte
+IO. In contrast, an explicitly narrowed opened-directory resource constrains the
+ceiling of every descendant it returns. Opening a file for writing must neither
+require write access merely to traverse nor recover rights removed by an
+explicitly narrowed directory. These operations revalidate the captured authenticated
 principal, current policy and original export lifetime. File opening uses the
 exact selected identity; it never resolves the node's former pathname. Requested
 access is explicit, including write-only, and cannot exceed the original export
