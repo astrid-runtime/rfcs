@@ -1,6 +1,6 @@
 - Feature Name: retained_filesystem
 - Start Date: 2026-10-21
-- RFC PR: pending
+- RFC PR: [rfcs#41](https://github.com/astrid-runtime/rfcs/pull/41)
 - Tracking Issue: [rfcs#40](https://github.com/astrid-runtime/rfcs/issues/40)
 - Status: Draft; no ABI registration, SDK publication or provider activation
 
